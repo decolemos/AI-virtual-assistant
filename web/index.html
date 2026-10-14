@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jarvis</title>
+  <style>
+    :root {
+      --fundo: #f6f7f9; --cartao: #ffffff; --texto: #1c1f24; --suave: #5f6670;
+      --borda: #dfe2e6; --destaque: #1f6feb; --eu: #e8f0fe;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fundo: #0f1115; --cartao: #181b21; --texto: #e7e9ec; --suave: #9aa1ab;
+        --borda: #2a2f37; --destaque: #4c8dff; --eu: #1d2a40;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--fundo); color: var(--texto);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 16px; min-height: 100vh; display: flex; flex-direction: column; gap: 12px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    h1 { font-size: 22px; margin: 0; }
+    button {
+      font: inherit; border: 1px solid var(--borda); background: var(--cartao); color: var(--texto);
+      border-radius: 10px; padding: 8px 14px; cursor: pointer;
+    }
+    button.principal { background: var(--destaque); border-color: var(--destaque); color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    #conversa { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+    .msg { padding: 10px 14px; border-radius: 12px; max-width: 85%; white-space: pre-wrap; border: 1px solid var(--borda); background: var(--cartao); }
+    .msg.eu { align-self: flex-end; background: var(--eu); }
+    .msg.erro { border-color: #d1242f; }
+    .dica { color: var(--suave); font-size: 14px; }
+    form { display: flex; gap: 8px; }
+    input[type=text] {
+      flex: 1; font: inherit; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--borda); background: var(--cartao); color: var(--texto); min-width: 0;
+    }
+    #mic.ouvindo { background: #d1242f; border-color: #d1242f; color: #fff; }
+    label { display: inline-flex; align-items: center; gap: 6px; color: var(--suave); font-size: 14px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Jarvis</h1>
+    <div>
+      <label><input type="checkbox" id="falar" checked> Falar respostas</label>
+      <button id="nova" hidden>Nova conversa</button>
+      <button id="sair" hidden>Sair</button>
+    </div>
+  </header>
+
+  <section id="login">
+    <p>Entre com a sua conta Google para falar com o Jarvis.</p>
+    <button class="principal" id="entrar">Entrar com Google</button>
+  </section>
+
+  <section id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1">
+    <div id="conversa">
+      <p class="dica">Experimente: "Jarvis, bom dia", "Como está o tempo amanhã?" ou "Quanto está o dólar?". Use o microfone ou digite.</p>
+    </div>
+    <form id="form">
+      <button type="button" id="mic" title="Falar">🎤</button>
+      <input type="text" id="texto" placeholder="Digite ou fale com o Jarvis" autocomplete="off">
+      <button class="principal" id="enviar">Enviar</button>
+    </form>
+  </section>
+</main>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
+  } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
+  // O Firebase Hosting serve a configuração do projeto neste endereço.
+  const config = await (await fetch("/__/firebase/init.json")).json();
+  const auth = getAuth(initializeApp(config));
+
+  const $ = (id) => document.getElementById(id);
+  const conversa = $("conversa");
+  let conversaId = lerConversaId();
+
+  function lerConversaId() {
+    try { return localStorage.getItem("conversaId") || undefined; } catch { return undefined; }
+  }
+  function guardarConversaId(id) {
+    try { id ? localStorage.setItem("conversaId", id) : localStorage.removeItem("conversaId"); } catch {}
+  }
+
+  function adicionar(texto, classe) {
+    const div = document.createElement("div");
+    div.className = "msg " + (classe || "");
+    div.textContent = texto;
+    conversa.appendChild(div);
+    div.scrollIntoView({ behavior: "smooth", block: "end" });
+    return div;
+  }
+
+  function falar(texto) {
+    if (!$("falar").checked || !("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const fala = new SpeechSynthesisUtterance(texto);
+    fala.lang = "pt-BR";
+    const voz = speechSynthesis.getVoices().find((v) => v.lang === "pt-BR");
+    if (voz) fala.voice = voz;
+    speechSynthesis.speak(fala);
+  }
+
+  async function enviar(texto) {
+    texto = texto.trim();
+    if (!texto) return;
+    adicionar(texto, "eu");
+    $("texto").value = "";
+    $("enviar").disabled = true;
+    const pensando = adicionar("…");
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const resp = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ texto, conversaId }),
+      });
+      const dados = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(dados.erro || "Erro " + resp.status);
+      conversaId = dados.conversaId;
+      guardarConversaId(conversaId);
+      pensando.textContent = dados.resposta;
+      falar(dados.resposta);
+    } catch (e) {
+      pensando.textContent = e.message;
+      pensando.classList.add("erro");
+    } finally {
+      $("enviar").disabled = false;
+    }
+  }
+
+  $("form").addEventListener("submit", (e) => { e.preventDefault(); enviar($("texto").value); });
+  $("entrar").addEventListener("click", () => signInWithPopup(auth, new GoogleAuthProvider()));
+  $("sair").addEventListener("click", () => signOut(auth));
+  $("nova").addEventListener("click", () => {
+    conversaId = undefined;
+    guardarConversaId(undefined);
+    conversa.querySelectorAll(".msg").forEach((m) => m.remove());
+  });
+
+  onAuthStateChanged(auth, (usuario) => {
+    $("login").hidden = !!usuario;
+    $("app").hidden = !usuario;
+    $("sair").hidden = !usuario;
+    $("nova").hidden = !usuario;
+  });
+
+  // Reconhecimento de voz do navegador (Chrome e Edge no Windows).
+  const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Reconhecimento) {
+    $("mic").hidden = true;
+  } else {
+    const rec = new Reconhecimento();
+    rec.lang = "pt-BR";
+    rec.interimResults = true;
+    let ouvindo = false;
+    rec.onresult = (e) => {
+      const resultado = e.results[e.results.length - 1];
+      $("texto").value = resultado[0].transcript;
+      if (resultado.isFinal) enviar(resultado[0].transcript);
+    };
+    rec.onend = () => { ouvindo = false; $("mic").classList.remove("ouvindo"); };
+    $("mic").addEventListener("click", () => {
+      if (ouvindo) { rec.stop(); return; }
+      speechSynthesis.cancel();
+      ouvindo = true;
+      $("mic").classList.add("ouvindo");
+      rec.start();
+    });
+  }
+</script>
+</body>
+</html>

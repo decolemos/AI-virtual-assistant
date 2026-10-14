@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Só o servidor (Cloud Functions) lê e grava. Os apps nunca acessam direto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

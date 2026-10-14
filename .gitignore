@@ -1,0 +1,9 @@
+node_modules/
+functions/lib/
+functions/lib-test/
+.firebase/
+*.log
+.env
+.env.*
+!.env.example
+.runtimeconfig.json
