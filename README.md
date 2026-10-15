@@ -44,7 +44,7 @@ O cérebro é o mesmo nas duas (`functions/src`); só muda quem o executa.
    - `EMAILS_PERMITIDOS`: o seu e-mail Google.
    - `CIDADE_PADRAO`: a sua cidade (opcional, o padrão é São Paulo).
    - `FIREBASE_SERVICE_ACCOUNT`: o conteúdo inteiro do arquivo JSON do passo 1.
-   - `FIREBASE_WEB_CONFIG`: o `firebaseConfig` do passo 1 em formato JSON, por exemplo `{"apiKey":"...","authDomain":"...","projectId":"...","appId":"..."}`.
+   - `FIREBASE_WEB_CONFIG`: o trecho `{ ... }` do `firebaseConfig` do passo 1, do jeito que o console mostra (JSON também serve).
 5. Clique em **Deploy**. A Vercel mostra o endereço do site, algo como `ai-virtual-assistant.vercel.app`.
 6. No Firebase, em **Authentication > Configurações > Domínios autorizados**, adicione esse endereço (sem `https://`).
 7. Abra o endereço no Chrome ou no Edge, entre com o Google e fale com o Jarvis.
