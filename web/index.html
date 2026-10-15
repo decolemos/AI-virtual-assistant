@@ -78,8 +78,17 @@
     getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
   } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
-  // O Firebase Hosting serve a configuração do projeto neste endereço.
-  const config = await (await fetch("/__/firebase/init.json")).json();
+  // No Firebase Hosting a configuração vem de /__/firebase/init.json; na Vercel, de /api/config.
+  async function lerConfig() {
+    for (const url of ["/__/firebase/init.json", "/api/config"]) {
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) return await resp.json();
+      } catch {}
+    }
+    throw new Error("Configuração do Firebase não encontrada.");
+  }
+  const config = await lerConfig();
   const auth = getAuth(initializeApp(config));
 
   const $ = (id) => document.getElementById(id);

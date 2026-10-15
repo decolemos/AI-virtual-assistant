@@ -4,6 +4,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { responder, linhaDeContexto, MODELO, type Contexto } from "../src/brain";
 import { consultarClima } from "../src/tools/clima";
 import { cabeNoLimite } from "../src/conversas";
+import { atenderChat, emailPermitido } from "../src/atender";
 
 const ctx: Contexto = {
   agora: new Date("2026-10-14T11:00:00Z"),
@@ -150,4 +151,32 @@ test("limite da conversa", () => {
   assert.equal(cabeNoLimite("x".repeat(10), 5), true);
   assert.equal(cabeNoLimite("x".repeat(600_000), 5), false);
   assert.equal(cabeNoLimite("x", 120), false);
+});
+
+test("atenderChat recusa método errado, falta de login e e-mail fora da lista", async () => {
+  const dep = {
+    verificarToken: async () => ({ uid: "u1", email: "outra@gmail.com" }),
+    db: {} as never,
+    client: clienteFalso([]).client,
+    emailsPermitidos: "andre@gmail.com, outro@gmail.com",
+    cidadePadrao: "São Paulo",
+  };
+  assert.equal((await atenderChat({ metodo: "GET", corpo: {} }, dep)).status, 405);
+  assert.equal((await atenderChat({ metodo: "POST", corpo: {} }, dep)).status, 401);
+  const r = await atenderChat({ metodo: "POST", autorizacao: "Bearer x", corpo: { texto: "oi" } }, dep);
+  assert.equal(r.status, 403);
+});
+
+test("atenderChat valida o texto e aceita e-mail sem diferenciar maiúsculas", async () => {
+  assert.equal(emailPermitido("Andre@Gmail.com", " andre@gmail.com ,x@y.com"), true);
+  assert.equal(emailPermitido(undefined, "andre@gmail.com"), false);
+  const dep = {
+    verificarToken: async () => ({ uid: "u1", email: "andre@gmail.com" }),
+    db: {} as never,
+    client: clienteFalso([]).client,
+    emailsPermitidos: "andre@gmail.com",
+    cidadePadrao: "São Paulo",
+  };
+  const r = await atenderChat({ metodo: "POST", autorizacao: "Bearer x", corpo: { texto: "  " } }, dep);
+  assert.equal(r.status, 400);
 });

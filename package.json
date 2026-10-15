@@ -1,0 +1,19 @@
+{
+  "name": "jarvis",
+  "private": true,
+  "description": "Cérebro do Jarvis na Vercel (gratuito). O código compartilhado fica em functions/src.",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "verificar": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "firebase-admin": "^14.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  }
+}
